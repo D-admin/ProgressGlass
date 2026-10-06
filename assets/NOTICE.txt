@@ -1,0 +1,14 @@
+ProgressGlass mascot artwork / 桌宠素材
+
+The mint-haired chibi character, animation atlas and matching head artwork were produced with AI image-generation assistance for this project. The ICO is a format conversion of the generated head. They are included as application assets under the repository's MS-RL terms, to the extent applicable rights can be licensed. No claim is made to exclusive ownership of generic character-design elements or to third-party reference material.
+
+本项目的薄荷绿发 Q 版角色、动画图集和配套头像使用 AI 图像生成工具辅助制作。ICO 为头像的格式转换。这些文件作为软件素材随仓库提供，在可许可的权利范围内适用仓库 MS-RL 条款；不主张通用设计元素或第三方参考素材的排他权利。
+
+Included files / 包含文件：
+mint-girl-dress.png — dress design / 裙装角色
+mint-girl-sprites.png — four animation poses in a 2×2 atlas / 四帧动作图集
+mint-girl-head.png — matching head portrait / 配套头像
+mint-girl.ico — Windows icon, nine sizes / Windows 九档图标
+
+No user reference photos, conversation history or generation-session logs are distributed.
+发行内容不包含用户参考照片、对话历史或生成会话记录。

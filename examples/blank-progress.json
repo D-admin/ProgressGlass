@@ -1,0 +1,9 @@
+{
+  "project": "Example project / 示例项目",
+  "current": "Replace this sample with an observed action / 替换为实际动作",
+  "next": "Record verifiable evidence / 记录可核实的证据",
+  "updatedAt": "2026-01-01T00:00:00Z",
+  "tasks": [
+    {"id":"sample","title":"Example task / 示例任务","status":"todo","evidence":"Template only; no real work is represented / 仅为模板，不代表实际工作"}
+  ]
+}

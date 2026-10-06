@@ -1,0 +1,14 @@
+# Local user data; never publish these files.
+/runtime.json
+/settings.json
+/pet-settings.json
+/usage-snapshot.json
+/progress.json
+*.lock
+*.tmp
+*.validation.txt
+/dist/
+/test-results/
+*.zip
+.DS_Store
+Thumbs.db

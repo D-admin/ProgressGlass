@@ -1,0 +1,17 @@
+ProgressGlass v0.4.2
+
+This is a new progress-display application reusing specific native-window helpers from OnTopReplica. It is not the complete OnTopReplica application and does not use window mirroring.
+
+Upstream: https://github.com/LorenzCK/OnTopReplica
+Revision: 63e9487423c491c9969fc7728125d3fa18073da2
+Copyright © Lorenz Cuno Klopfenstein 2010 (upstream assembly attribution).
+License: Microsoft Reciprocal License (MS-RL), included in licenses/OnTopReplica-MS-RL.txt.
+
+Unmodified upstream source files included and compiled:
+src/OnTopReplica/WindowMethods.cs
+src/OnTopReplica/Point.cs
+src/OnTopReplica/Rectangle.cs
+
+All new source files in this distribution are also provided under MS-RL. Complete corresponding source and build instructions are included. No endorsement by upstream or OpenAI is implied.
+
+

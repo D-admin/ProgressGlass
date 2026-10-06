@@ -1,0 +1,10 @@
+{
+  "project": "示例：导入任务（演示数据）",
+  "current": "演示字段格式；这些数值不是正在执行的真实任务",
+  "next": "将计数来源换成你的实际工具输出",
+  "updatedAt": "2026-10-06T10:00:00+08:00",
+  "tasks": [
+    {"id":"import","title":"示例数据导入","status":"doing","evidence":"仅为字段格式演示，不代表实际执行","measurement":{"completed":240,"total":1000,"unit":"条","source":"演示数据；使用时替换成真实计数文件","observedAt":"2026-10-06T10:00:00+08:00"}},
+    {"id":"development","title":"示例功能开发","status":"doing","evidence":"总工作量未知，只记录已经验证的行为，不估算百分比"}
+  ]
+}
