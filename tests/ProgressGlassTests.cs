@@ -132,6 +132,31 @@ class Tests {
         Check(screen.Contains(new Rectangle(position,popupSize)),"popup stays on negative-coordinate monitor near top edge");
         using(var cat=new Bitmap(Path.Combine(dir,"assets","mint-girl-dress.png"))){Check(cat.GetPixel(0,0).A<=8 && cat.GetPixel(cat.Width/2,cat.Height/2).A>200,"generated pet has transparent alpha and visible center; compositor removes faint background noise");}
         using(var pop=new CompanionBubble(1)) {pop.SetData(dashboard,new NetworkSnapshot{title="入口有响应 · HTTP 403",detail="生成通道状态未知"});pop.Render(Path.Combine(dir,"pet-test-render.png"));Check(pop.Height<500,"one active chat produces compact bubble");}
+        var animation=new PetAnimation(17);var poses=new HashSet<int>();var actions=new HashSet<string>();bool bounded=true;
+        for(int tick=0;tick<9000;tick++){
+            var motion=animation.Sample(tick*33,0,false,false,false);poses.Add(motion.pose);actions.Add(motion.action);
+            bounded &= motion.pose>=0 && motion.pose<12 && Math.Abs(motion.tilt)<6 && motion.lift>=0 && motion.lift<8 && motion.scaleY>.94 && motion.scaleY<1.06;
+        }
+        Check(bounded && poses.Contains(1) && poses.Contains(2),"five-minute idle timeline blinks with bounded motion and valid atlas cells");
+        Check(actions.Contains("curious") && actions.Contains("yawn") && actions.Contains("wink") && actions.Contains("happy"),"idle has varied expressions rather than a constant wave loop");
+        var interaction=new PetAnimation(2);
+        Check(interaction.Sample(0,-1,true,false,false).pose==3 && interaction.Sample(33,1,true,false,false).pose==4,"eyes look toward a nearby cursor on either side");
+        interaction.Click(100);interaction.Greet(150);
+        Check(interaction.Sample(200,0,true,false,false).action=="delight" && interaction.Sample(800,0,true,false,false).pose==7,"hover does not interrupt click response and mouth changes to laugh");
+        Check(interaction.Sample(900,1,true,true,false).pose==5,"dragging gets surprised expression without replacing click detection");
+        interaction.Land(1000);Check(interaction.Sample(1200,0,false,false,false).action=="settle" && interaction.Sample(1800,0,false,false,false).action=="idle","release settles briefly then returns to idle");
+        interaction.Click(2000);var gentle=interaction.Sample(2400,1,true,false,true);
+        Check(gentle.tilt==0 && gentle.lift==0 && gentle.scaleX==1 && gentle.scaleY==1 && gentle.sparkle==0,"gentle mode preserves facial expression without body motion or flashes");
+        bool contained=true,visible=true;
+        using(var sprites=new PetSprites(Path.Combine(dir,"assets","mint-girl-expressions.png"))){
+            foreach(int size in new[]{96,128,160})for(int pose=0;pose<12;pose++){
+                var bmp=sprites.Render(new Size(size,size),new PetMotion{pose=pose,tilt=pose%2==0?3:-3,lift=5});int pixels=0;
+                for(int x=0;x<size;x++){contained &= bmp.GetPixel(x,0).A<16 && bmp.GetPixel(x,size-1).A<16;}
+                for(int y=0;y<size;y++){contained &= bmp.GetPixel(0,y).A<16 && bmp.GetPixel(size-1,y).A<16;for(int x=0;x<size;x++)if(bmp.GetPixel(x,y).A>100)pixels++;}
+                visible &= pixels>size*size/5;
+            }
+        }
+        Check(contained && visible,"all twelve expressions stay visible and unclipped at all menu sizes during tilt and bounce");
         Console.WriteLine("ALL "+checks+" CHECKS PASSED");return 0;
     }catch(Exception ex){Console.Error.WriteLine(ex);return 1;}}
 }

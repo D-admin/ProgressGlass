@@ -4,11 +4,13 @@ English | [中文](README.md)
 
 A lightweight Windows desktop companion that shows local Codex chat activity, account usage snapshots, and connectivity checks through an animated chibi character.
 
-![Animation poses and tray icon preview](preview-style.png)
+![Twelve eye, mouth and gesture expressions](preview-style.png)
 
 ## Features
 
-- **Animated desktop pet:** mint-green hair and a pink dress, with blinking, gentle movement and waving. Hovering or clicking triggers a greeting.
+- **Twelve expressions:** mint-green hair and a pink dress, with natural blinking, side glances, closed-mouth smiles, surprise, winks, laughter, waving, curiosity and yawning.
+- **Expressive interaction:** look toward a nearby pointer, greet on hover, smile and bounce on click, look surprised while dragging, and settle on release. Idle behavior adds gentle breathing, swaying and occasional expressions.
+- **Gentle mode:** reduce body movement, bouncing and decorative sparkles through the context menu while keeping facial expressions.
 - **Hover bubble:** reveal activity on hover, pin it with a click, drag the character to move it, and page through multiple chats.
 - **Activity across local projects:** discover open Codex turns, pending tools and recognized approval events. Completed or interrupted turns disappear automatically.
 - **Evidence-based status:** show recent events and silence without inventing completion percentages from milestones, elapsed time, tokens or animation.
@@ -19,7 +21,7 @@ A lightweight Windows desktop companion that shows local Codex chat activity, ac
 
 ## Download and run
 
-1. Open this repository's **Releases** and download `ProgressGlass-v0.4.2-windows.zip`.
+1. Open the [latest release](https://github.com/D-admin/ProgressGlass/releases/latest) and download `ProgressGlass-v0.4.3-windows.zip`.
 2. **Extract the whole ZIP** into a writable folder, such as a folder under Documents. Do not run it inside the archive.
 3. Double-click `ProgressGlass.exe`. Keep the `assets` folder beside the executable.
 4. The character appears near the bottom-right corner of the primary screen. Initial session scanning may take a few seconds.
@@ -29,17 +31,20 @@ Requires Windows 10/11 and .NET Framework 4.8 or a compatible runtime. This is a
 
 The character can run without local Codex sessions, but activity and usage data may be unavailable.
 
+To upgrade, exit the old pet and extract the complete new archive into a new folder. This version needs its new expression atlas; replacing only the EXE is insufficient. To retain position and size, copy `pet-settings.json` from the old folder into the new one.
+
 ## Controls
 
 | Action | Result |
 | --- | --- |
-| Hover over the character | Open the activity bubble |
+| Move the pointer near the character | Eyes glance toward the nearby pointer |
+| Hover over the character | Wave and open the activity bubble |
 | Move outside both character and bubble | Close an unpinned bubble after about 0.65 seconds |
-| Click the character | Pin the bubble; click again to close it |
-| Drag the character | Move it and save its position |
+| Click the character | Respond happily and pin the bubble; click again to close it |
+| Drag the character | Look surprised, move and save the position, then settle on release |
 | Pin / close button in the bubble | Pin or dismiss the bubble |
 | Bottom arrows / mouse wheel | Page through activity |
-| Right-click the character or tray icon | Change size, show the bubble, hide, or exit |
+| Right-click the character or tray icon | Change size, toggle gentle mode, show the bubble, hide, or exit |
 | `Ctrl+Alt+P` | Show / hide the character |
 | `Ctrl+Alt+O` | Open and pin / close the bubble |
 
@@ -107,7 +112,7 @@ From Windows PowerShell 5.1+ or PowerShell 7 in the repository directory:
 
 The build uses Windows .NET Framework's bundled `csc.exe`; Node.js, Python, NuGet and paid generation services are unnecessary. Tests use local synthetic fixtures and the tracked `examples/blank-progress.json`. The build copies `assets` into the output directory and creates `progress.json` from that generic template only when it is absent, preserving existing records. Personal root-level `progress.json` is ignored by Git; a clean checkout can build and test without it.
 
-Developer options: `--render-style preview.png` exports the mascot/icon preview; `--render-pet preview.png` exports a live bubble snapshot (reads local state and probes the network); `--legacy` opens the rectangular overlay; `--windowed` exposes a taskbar button for debugging.
+Developer options: `--render-style preview.png` exports the twelve-expression preview; `--render-animation frames` exports an interaction animation as a PNG frame sequence; `--render-pet preview.png` exports a live bubble snapshot (reads local state and probes the network); `--legacy` opens the rectangular overlay; `--windowed` exposes a taskbar button for debugging.
 
 ## License and artwork
 

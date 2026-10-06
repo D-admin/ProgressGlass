@@ -7,6 +7,7 @@ The mint-haired chibi character, animation atlas and matching head artwork were 
 Included files / 包含文件：
 mint-girl-dress.png — dress design / 裙装角色
 mint-girl-sprites.png — four animation poses in a 2×2 atlas / 四帧动作图集
+mint-girl-expressions.png — twelve facial expressions and gestures in a 3×4 atlas / 十二种眼睛、嘴型与动作表情图集
 mint-girl-head.png — matching head portrait / 配套头像
 mint-girl.ico — Windows icon, nine sizes / Windows 九档图标
 

@@ -10,7 +10,7 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 namespace ProgressGlass {
-    public class PetSettings { public int x=Int32.MinValue,y=Int32.MinValue,size=128; }
+    public class PetSettings { public int x=Int32.MinValue,y=Int32.MinValue,size=128; public bool gentle; }
     public class PetGesture {
         public bool pressed,dragged;
         public Point origin,window;
@@ -46,7 +46,7 @@ namespace ProgressGlass {
     public class PetCompanion : Form {
         readonly string root=AppDomain.CurrentDomain.BaseDirectory;
         readonly JavaScriptSerializer json=new JavaScriptSerializer();
-        readonly Timer timer=new Timer {Interval=150};
+        readonly Timer timer=new Timer {Interval=33};
         readonly NotifyIcon tray=new NotifyIcon();
         readonly PetGesture gesture=new PetGesture();
         readonly AllChatsObserver observer;
@@ -54,8 +54,9 @@ namespace ProgressGlass {
         readonly PetSprites art;
         readonly Icon mascotIcon;
         readonly System.Diagnostics.Stopwatch animationClock=System.Diagnostics.Stopwatch.StartNew();
-        double greetingUntil;
-        int lastPose=-1,lastSway=-1,renderCount;
+        readonly PetAnimation animation=new PetAnimation();
+        PetMotion lastMotion=new PetMotion();
+        int lastPose=-1,renderCount;
         Size renderedSize;
         PetSettings prefs;
         Task<DashboardSnapshot> dataTask;
@@ -72,7 +73,7 @@ namespace ProgressGlass {
             if(prefs==null) prefs=new PetSettings();prefs.size=Math.Max(88,Math.Min(160,prefs.size));
             FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=windowed;TopMost=true;StartPosition=FormStartPosition.Manual;AutoScaleMode=AutoScaleMode.None;Text="ProgressGlass · 薄荷";
             using(var g=CreateGraphics()) dpi=g.DpiX/96f;
-            art=new PetSprites(Path.Combine(root,"assets","mint-girl-sprites.png"));
+            art=new PetSprites(Path.Combine(root,"assets","mint-girl-expressions.png"));
             mascotIcon=new Icon(Path.Combine(root,"assets","mint-girl.ico"),32,32);Icon=mascotIcon;
             Size=new Size((int)(prefs.size*dpi),(int)(prefs.size*dpi));
             var area=Screen.PrimaryScreen.WorkingArea;
@@ -86,37 +87,44 @@ namespace ProgressGlass {
             var menu=new ContextMenuStrip();
             menu.Items.Add("显示 / 收起任务气泡",null,delegate {hidden=false;Show();ToggleBubble();});
             foreach(int size in new[]{96,128,160}) {int value=size;menu.Items.Add("角色大小 · "+size,null,delegate {prefs.size=value;Size=new Size((int)(value*dpi),(int)(value*dpi));Location=PetLayout.Clamp(Location,Size,Screen.FromPoint(Location).WorkingArea);PaintPet();PlaceBubble();Save();});}
+            var gentleItem=new ToolStripMenuItem("轻柔模式 · 减少摆动和弹跳"){CheckOnClick=true,Checked=prefs.gentle};
+            gentleItem.CheckedChanged+=delegate {prefs.gentle=gentleItem.Checked;lastPose=-1;PaintPet();Save();};menu.Items.Add(gentleItem);
             menu.Items.Add("隐藏角色（Ctrl+Alt+P 恢复）",null,delegate {hidden=true;Hide();bubble.Hide();});
             menu.Items.Add("退出",null,delegate {Close();});ContextMenuStrip=menu;
             tray.Icon=mascotIcon;tray.Text="薄荷 · 悬停看任务，点击固定";tray.ContextMenuStrip=menu;tray.Visible=true;
             tray.DoubleClick+=delegate {hidden=false;Show();OpenBubble();};
             Shown+=delegate {PaintPet();Native.RegisterHotKey(Handle,1,0x4003,(uint)Keys.P);Native.RegisterHotKey(Handle,2,0x4003,(uint)Keys.O);timer.Start();Tick();};
-            MouseEnter+=delegate {greetingUntil=animationClock.Elapsed.TotalMilliseconds+1800;if(!suppressHover && !gesture.pressed) OpenBubble();};
+            MouseEnter+=delegate {if(!gesture.pressed)animation.Greet(animationClock.Elapsed.TotalMilliseconds);if(!suppressHover && !gesture.pressed) OpenBubble();};
             MouseDown+=delegate(object sender,MouseEventArgs e) {if(e.Button==MouseButtons.Left){gesture.Down(Cursor.Position,Location);Capture=true;}};
             MouseMove+=delegate {if(!gesture.pressed)return;Point p=gesture.Move(Cursor.Position);if(gesture.dragged){Location=PetLayout.Clamp(p,Size,Screen.FromPoint(Cursor.Position).WorkingArea);if(!pinned)bubble.Hide();else PlaceBubble();}};
-            MouseUp+=delegate(object sender,MouseEventArgs e) {if(e.Button!=MouseButtons.Left)return;bool click=gesture.Up();Capture=false;if(click){greetingUntil=animationClock.Elapsed.TotalMilliseconds+1800;ToggleBubble();}else {suppressHover=true;Save();}};
+            MouseUp+=delegate(object sender,MouseEventArgs e) {if(e.Button!=MouseButtons.Left)return;bool click=gesture.Up();Capture=false;if(click){animation.Click(animationClock.Elapsed.TotalMilliseconds);ToggleBubble();}else {animation.Land(animationClock.Elapsed.TotalMilliseconds);suppressHover=true;Save();}};
             timer.Tick+=delegate {Tick();};
             FormClosed+=delegate {timer.Stop();Save();Native.UnregisterHotKey(Handle,1);Native.UnregisterHotKey(Handle,2);bubble.Dispose();tray.Visible=false;tray.Dispose();menu.Dispose();art.Dispose();mascotIcon.Dispose();timer.Dispose();};
         }
         protected override bool ShowWithoutActivation {get{return !windowed;}}
         protected override CreateParams CreateParams {get{var cp=base.CreateParams;cp.ExStyle|=0x80000;if(!windowed)cp.ExStyle|=0x80|0x8000000;return cp;}}
         protected override void WndProc(ref Message m) {if(m.Msg==0x312){if(m.WParam.ToInt32()==1){hidden=!hidden;if(hidden){Hide();bubble.Hide();}else Show();}else {hidden=false;Show();ToggleBubble();}return;}base.WndProc(ref m);}
-        void PaintPet() {double elapsed=animationClock.Elapsed.TotalMilliseconds;int pose=PetSprites.Pose(elapsed,elapsed<greetingUntil),sway=PetSprites.Sway(elapsed);
-            if(pose==lastPose && sway==lastSway && renderedSize==Size)return;
-            LayeredPet.Draw(this,art.Frame(Size,pose,sway));lastPose=pose;lastSway=sway;renderedSize=Size;renderCount++;}
+        void PaintPet() {
+            var attention=Bounds;attention.Inflate(Width*2,Height*2);
+            var cursor=Cursor.Position;
+            var motion=animation.Sample(animationClock.Elapsed.TotalMilliseconds,(cursor.X-(Left+Width/2.0))/(Width*.8),attention.Contains(cursor),gesture.pressed && gesture.dragged,prefs.gentle);
+            lastMotion=motion;
+            if(prefs.gentle && motion.pose==lastPose && renderedSize==Size)return;
+            LayeredPet.Draw(this,art.Render(Size,motion));lastPose=motion.pose;renderedSize=Size;renderCount++;
+        }
         void Save() {prefs.x=Left;prefs.y=Top;try{Overlay.AtomicWrite(Path.Combine(root,"pet-settings.json"),json.Serialize(prefs));}catch{}}
         void PlaceBubble() {bubble.Location=PetLayout.Bubble(Bounds,bubble.Size,Screen.FromRectangle(Bounds).WorkingArea);}
         void OpenBubble() {if(hidden)return;bubble.Pinned=pinned;PlaceBubble();bubble.SetData(data,network);if(!bubble.Visible)bubble.Show(this);lastInside=DateTimeOffset.Now;}
         void ToggleBubble() {if(pinned){pinned=false;bubble.Hide();suppressHover=true;}else {pinned=true;OpenBubble();}bubble.Pinned=pinned;bubble.Invalidate();}
         void Tick() {
             var now=DateTimeOffset.Now;
-            if(!hidden && !(gesture.pressed && gesture.dragged))PaintPet();
+            if(!hidden)PaintPet();
             bool inPet=Bounds.Contains(Cursor.Position),inside=inPet || (bubble.Visible && bubble.Bounds.Contains(Cursor.Position));
             if(!inPet)suppressHover=false;
             if(inside)lastInside=now;else if(!pinned && (now-lastInside).TotalMilliseconds>650)bubble.Hide();
             if(dataTask!=null && dataTask.IsCompleted){
                 if(dataTask.IsFaulted)data.error="会话观测暂不可用";else data=dataTask.Result;dataTask=null;bubble.SetData(data,network);PlaceBubble();
-                try{Overlay.AtomicWrite(Path.Combine(root,"runtime.json"),json.Serialize(new{version="0.4.2",mode="desktop-pet",observedAt=now.ToString("o"),pet=new{x=Left,y=Top,size=prefs.size,style="mint-dress",animationPose=lastPose,animationSway=lastSway,renderCount=renderCount,trayIcon="mint-girl.ico"},scope="all-local-codex-projects",dashboard=data,network=network}));}catch{}
+                try{Overlay.AtomicWrite(Path.Combine(root,"runtime.json"),json.Serialize(new{version="0.4.3",mode="desktop-pet",observedAt=now.ToString("o"),pet=new{x=Left,y=Top,size=prefs.size,style="mint-dress-expressive",animationPose=lastPose,animationExpression=PetSprites.Names[Math.Max(0,lastPose)],animationAction=lastMotion.action,animationTilt=lastMotion.tilt,animationLift=lastMotion.lift,gentle=prefs.gentle,animationIntervalMs=timer.Interval,renderCount=renderCount,trayIcon="mint-girl.ico"},scope="all-local-codex-projects",dashboard=data,network=network}));}catch{}
             }
             if(networkTask!=null && networkTask.IsCompleted){network=networkTask.IsFaulted ? new NetworkSnapshot{title="网络检测暂不可用"} : networkTask.Result;networkTask=null;bubble.SetData(data,network);}
             if(dataTask==null && now>=nextData){nextData=now.AddSeconds(1);dataTask=Task.Factory.StartNew(()=>observer.Read(DateTimeOffset.Now));}

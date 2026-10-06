@@ -145,7 +145,7 @@ namespace ProgressGlass {
                 if(!s.localConnected) {s.title="本地网络接口断开";s.detail="未检测到可用网卡";return s;}
                 ServicePointManager.SecurityProtocol|=SecurityProtocolType.Tls12;
                 var r=(HttpWebRequest)WebRequest.Create(ProbeUrl);
-                r.Method="GET";r.Timeout=6000;r.ReadWriteTimeout=6000;r.AllowAutoRedirect=false;r.UserAgent="ProgressGlass/0.4.2";
+                r.Method="GET";r.Timeout=6000;r.ReadWriteTimeout=6000;r.AllowAutoRedirect=false;r.UserAgent="ProgressGlass/0.4.3";
                 HttpWebResponse response;
                 try {response=(HttpWebResponse)r.GetResponse();}
                 catch(WebException ex) {response=ex.Response as HttpWebResponse;if(response==null)throw;}

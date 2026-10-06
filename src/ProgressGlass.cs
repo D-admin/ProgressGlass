@@ -469,6 +469,7 @@ namespace ProgressGlass {
             string file = null;
             for(int i=0;i<args.Length-1;i++) if(args[i]=="--file") file=args[i+1];
             if(args.Length>1 && args[0]=="--render-style") {PetSprites.RenderPreview(AppDomain.CurrentDomain.BaseDirectory,args[1]);return 0;}
+            if(args.Length>1 && args[0]=="--render-animation") {PetSprites.RenderAnimation(AppDomain.CurrentDomain.BaseDirectory,args[1]);return 0;}
             if(args.Length>1 && args[0]=="--render") { using(var f=new Overlay(file,true)) f.Render(args[1],!args.Contains("--compact")); return 0; }
             if(args.Length>1 && args[0]=="--render-pet") {
                 string home=Environment.GetEnvironmentVariable("CODEX_HOME")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".codex");
