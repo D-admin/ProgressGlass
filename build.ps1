@@ -10,7 +10,7 @@ if ($OutputDirectory -ne $PSScriptRoot) {
     $assetOutput = Join-Path $OutputDirectory 'assets'
     New-Item -ItemType Directory -Force -Path $assetOutput | Out-Null
     Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'assets') -File | Where-Object { $_.Extension -in @('.png','.ico') } | Copy-Item -Destination $assetOutput -Force
-    foreach ($document in @('README.md','README.en.md','preview-style.png')) {
+    foreach ($document in @('README.md','README.en.md','DOCKING.txt','preview-style.png','preview-docking.png')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $document) -Destination $OutputDirectory -Force
     }
 }

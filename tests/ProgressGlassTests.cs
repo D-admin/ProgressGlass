@@ -157,6 +157,47 @@ class Tests {
             }
         }
         Check(contained && visible,"all twelve expressions stay visible and unclipped at all menu sizes during tilt and bounce");
+        var dockSize=new Size(128,128);
+        Check(PetDocking.Snap(new Rectangle(-900,946,128,128),screen,22)=="bottom","drag near taskbar snaps bottom");
+        Check(PetDocking.Snap(new Rectangle(-1910,300,128,128),screen,22)=="left" && PetDocking.Snap(new Rectangle(-140,300,128,128),screen,22)=="right","drag near either side snaps correctly on negative monitor");
+        Check(PetDocking.Snap(new Rectangle(-900,400,128,128),screen,22)=="none" && PetDocking.Snap(new Rectangle(-1920,952,128,128),screen,22)=="bottom","interior stays free and exact corner has deterministic bottom priority");
+        foreach(string side in new[]{"bottom","left","right"}){
+            var p=PetDocking.Place(new Point(-900,400),dockSize,screen,side);var v=PetDocking.Visible(dockSize,side);v.Offset(p);
+            Check(screen.Contains(v) && (side=="bottom"?v.Bottom==screen.Bottom:side=="left"?v.Left==screen.Left:v.Right==screen.Right),side+" visible half stays inside screen with hands aligned at boundary");
+            var shifted=screen;shifted.Offset(200,100);var followed=PetDocking.Place(new Point(-700,500),dockSize,shifted,side);
+            Check(followed==new Point(p.X+200,p.Y+100),side+" follows translated target");
+            Check(screen.Contains(new Rectangle(PetLayout.Bubble(v,popupSize,screen),popupSize)),side+" popup remains accessible");
+        }
+        bool perchVisible=true,perchTransparent=true;
+        using(var perch=new PetPerchSprites(Path.Combine(dir,"assets","mint-girl-perch.png"))){
+            foreach(int size in new[]{96,128,160})foreach(string side in new[]{"bottom","left","right"})for(int pose=0;pose<12;pose++){
+                var v=PetDocking.Visible(new Size(size,size),side);var bmp=perch.Render(new Size(size,size),side,pose,1234,false);int pixels=0;
+                for(int y=0;y<size;y++)for(int x=0;x<size;x++){var a=bmp.GetPixel(x,y).A;if(!v.Contains(x,y))perchTransparent &= a==0;if(a>100)pixels++;}
+                perchVisible &= pixels>size*size/10;
+            }
+        }
+        Check(perchVisible && perchTransparent,"all docking sides expressions and sizes render visible art with fully transparent hidden half");
+        var oldPrefs=Json.Deserialize<PetSettings>("{\"x\":100,\"y\":200,\"size\":96,\"gentle\":true}");
+        Check(oldPrefs.dock=="none" && oldPrefs.snapEdges && oldPrefs.size==96 && oldPrefs.gentle,"old settings retain user preferences and default to undocked");
+        oldPrefs.dock="left";oldPrefs.dockFraction=.37;var roundtrip=Json.Deserialize<PetSettings>(Json.Serialize(oldPrefs));
+        Check(roundtrip.dock=="left" && roundtrip.dockFraction==.37 && roundtrip.gentle,"docking settings persist independently of animation preferences");
+        // Exercise actual form methods against a separate test window, without touching user apps.
+        using(var target=new Form {Text="ProgressGlass docking test",StartPosition=FormStartPosition.Manual,Bounds=new Rectangle(240,180,600,400)})
+        using(var pet=new PetCompanion(file)){
+            target.Show();Application.DoEvents();
+            var flags=BindingFlags.NonPublic|BindingFlags.Instance;
+            pet.GetType().GetField("lastExternalWindow",flags).SetValue(pet,target.Handle);
+            Invoke(pet,"DockTo","bottom",true);var before=pet.Location;
+            Check((IntPtr)Field(pet,"dockWindow")==target.Handle,"live form binds to selected window");
+            target.Location=new Point(target.Left+70,target.Top+45);Application.DoEvents();Invoke(pet,"RefreshDock");
+            Check(pet.Location==new Point(before.X+70,before.Y+45),"live pet follows moved window");
+            int oldY=pet.Top;target.Height+=50;Application.DoEvents();Invoke(pet,"RefreshDock");
+            Check(pet.Top==oldY+50,"live pet follows resized window bottom");
+            target.Hide();Invoke(pet,"RefreshDock");
+            Check((IntPtr)Field(pet,"dockWindow")==IntPtr.Zero,"hidden or closed target safely falls back to screen");
+            Invoke(pet,"Detach");Check(((PetSettings)Field(pet,"prefs")).dock=="none","detach restores full-body mode");
+            target.Close();pet.Close();
+        }
         Console.WriteLine("ALL "+checks+" CHECKS PASSED");return 0;
     }catch(Exception ex){Console.Error.WriteLine(ex);return 1;}}
 }

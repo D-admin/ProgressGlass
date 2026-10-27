@@ -1,0 +1,19 @@
+依附 / 扒边（0.4.4）
+
+将角色拖到屏幕底部任务栏、左边或右边附近，松开后自动切换为半身扒边姿态。
+按住角色拖回屏幕中间，即恢复全身；右键也可选择“依附 / 扒边 → 离开边框”。
+右键“依附 / 扒边”可以直接选择底部、左边、右边，或关闭拖到边缘自动依附。
+先点击想依附的应用窗口，再右键桌宠，选择“依附最近使用的窗口”及边框方向。
+桌宠会跟随窗口移动和缩放；目标最小化、隐藏或关闭后回到屏幕边缘。
+屏幕依附方向和相对位置会保存；重启后不恢复旧窗口句柄，改为屏幕依附。
+依附时仍可眨眼、微笑，悬停查看任务气泡，点击固定气泡。
+
+Edge docking (0.4.4)
+
+Drag the pet near the bottom taskbar or either screen side and release to cling to that edge.
+Drag back into the screen to restore the full-body pose, or use the Detach item in the docking submenu.
+The right-click docking submenu also offers direct bottom/left/right placement and an auto-snap toggle.
+To cling to a window, first activate that application, then right-click the pet and choose the recent-window submenu and an edge.
+The pet follows the window as it moves or resizes. A minimized, hidden or closed target falls back to the screen edge.
+Screen docking direction and relative position are saved. Window handles are not restored across restarts.
+Blinking, smiling, hover details and click-to-pin remain available while docked.

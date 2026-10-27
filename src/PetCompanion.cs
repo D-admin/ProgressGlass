@@ -10,7 +10,7 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 namespace ProgressGlass {
-    public class PetSettings { public int x=Int32.MinValue,y=Int32.MinValue,size=128; public bool gentle; }
+    public class PetSettings { public int x=Int32.MinValue,y=Int32.MinValue,size=128; public bool gentle; public bool snapEdges=true; public string dock="none"; public double dockFraction=.8; }
     public class PetGesture {
         public bool pressed,dragged;
         public Point origin,window;
@@ -52,6 +52,10 @@ namespace ProgressGlass {
         readonly AllChatsObserver observer;
         readonly CompanionBubble bubble;
         readonly PetSprites art;
+        readonly PetPerchSprites perchArt;
+        readonly int ownProcess=System.Diagnostics.Process.GetCurrentProcess().Id;
+        IntPtr lastExternalWindow,dockWindow;uint dockOwner;
+        DateTimeOffset nextDockCheck=DateTimeOffset.MinValue;
         readonly Icon mascotIcon;
         readonly System.Diagnostics.Stopwatch animationClock=System.Diagnostics.Stopwatch.StartNew();
         readonly PetAnimation animation=new PetAnimation();
@@ -71,22 +75,39 @@ namespace ProgressGlass {
             windowed=windowedMode;
             try {prefs=json.Deserialize<PetSettings>(File.ReadAllText(Path.Combine(root,"pet-settings.json")));}catch{}
             if(prefs==null) prefs=new PetSettings();prefs.size=Math.Max(88,Math.Min(160,prefs.size));
+            prefs.dock=PetDocking.Normalize(prefs.dock);
+            if(Double.IsNaN(prefs.dockFraction)||Double.IsInfinity(prefs.dockFraction))prefs.dockFraction=.8;
+            prefs.dockFraction=Math.Max(0,Math.Min(1,prefs.dockFraction));
             FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=windowed;TopMost=true;StartPosition=FormStartPosition.Manual;AutoScaleMode=AutoScaleMode.None;Text="ProgressGlass · 薄荷";
             using(var g=CreateGraphics()) dpi=g.DpiX/96f;
             art=new PetSprites(Path.Combine(root,"assets","mint-girl-expressions.png"));
+            perchArt=new PetPerchSprites(Path.Combine(root,"assets","mint-girl-perch.png"));
             mascotIcon=new Icon(Path.Combine(root,"assets","mint-girl.ico"),32,32);Icon=mascotIcon;
             Size=new Size((int)(prefs.size*dpi),(int)(prefs.size*dpi));
             var area=Screen.PrimaryScreen.WorkingArea;
             Location=prefs.x==Int32.MinValue ? new Point(area.Right-Width-32,area.Bottom-Height-32) : PetLayout.Clamp(new Point(prefs.x,prefs.y),Size,Screen.FromPoint(new Point(prefs.x,prefs.y)).WorkingArea);
             bubble=new CompanionBubble(dpi);
             bubble.Icon=mascotIcon;
+            RefreshDock();
             bubble.PinRequested+=delegate {pinned=!pinned;bubble.Pinned=pinned;bubble.Invalidate();};
             bubble.CloseRequested+=delegate {pinned=false;suppressHover=true;bubble.Hide();};
             string home=Environment.GetEnvironmentVariable("CODEX_HOME");if(String.IsNullOrEmpty(home)) home=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".codex");
             observer=new AllChatsObserver(home,root,file??Path.Combine(root,"progress.json"));
             var menu=new ContextMenuStrip();
             menu.Items.Add("显示 / 收起任务气泡",null,delegate {hidden=false;Show();ToggleBubble();});
-            foreach(int size in new[]{96,128,160}) {int value=size;menu.Items.Add("角色大小 · "+size,null,delegate {prefs.size=value;Size=new Size((int)(value*dpi),(int)(value*dpi));Location=PetLayout.Clamp(Location,Size,Screen.FromPoint(Location).WorkingArea);PaintPet();PlaceBubble();Save();});}
+            foreach(int size in new[]{96,128,160}) {int value=size;menu.Items.Add("角色大小 · "+size,null,delegate {prefs.size=value;Size=new Size((int)(value*dpi),(int)(value*dpi));RefreshDock();PaintPet();PlaceBubble();Save();});}
+            var dockMenu=new ToolStripMenuItem("依附 / 扒边");
+            dockMenu.DropDownItems.Add("扒在底部任务栏 / 屏幕底边",null,delegate{DockTo("bottom",false);});
+            dockMenu.DropDownItems.Add("扒在屏幕左边",null,delegate{DockTo("left",false);});
+            dockMenu.DropDownItems.Add("扒在屏幕右边",null,delegate{DockTo("right",false);});
+            var windowMenu=new ToolStripMenuItem("依附最近使用的窗口");
+            windowMenu.DropDownItems.Add("窗口底边",null,delegate{DockTo("bottom",true);});
+            windowMenu.DropDownItems.Add("窗口左边",null,delegate{DockTo("left",true);});
+            windowMenu.DropDownItems.Add("窗口右边",null,delegate{DockTo("right",true);});dockMenu.DropDownItems.Add(windowMenu);
+            dockMenu.DropDownItems.Add("离开边框 · 恢复全身",null,delegate{Detach();Save();});
+            var autoDock=new ToolStripMenuItem("拖到屏幕边缘自动依附"){CheckOnClick=true,Checked=prefs.snapEdges};
+            autoDock.CheckedChanged+=delegate{prefs.snapEdges=autoDock.Checked;Save();};dockMenu.DropDownItems.Add(autoDock);menu.Items.Add(dockMenu);
+            menu.Opening+=delegate{RememberWindow();Rectangle r;windowMenu.Enabled=lastExternalWindow!=IntPtr.Zero&&DockWindows.Bounds(lastExternalWindow,DockWindows.Owner(lastExternalWindow),out r);};
             var gentleItem=new ToolStripMenuItem("轻柔模式 · 减少摆动和弹跳"){CheckOnClick=true,Checked=prefs.gentle};
             gentleItem.CheckedChanged+=delegate {prefs.gentle=gentleItem.Checked;lastPose=-1;PaintPet();Save();};menu.Items.Add(gentleItem);
             menu.Items.Add("隐藏角色（Ctrl+Alt+P 恢复）",null,delegate {hidden=true;Hide();bubble.Hide();});
@@ -96,35 +117,68 @@ namespace ProgressGlass {
             Shown+=delegate {PaintPet();Native.RegisterHotKey(Handle,1,0x4003,(uint)Keys.P);Native.RegisterHotKey(Handle,2,0x4003,(uint)Keys.O);timer.Start();Tick();};
             MouseEnter+=delegate {if(!gesture.pressed)animation.Greet(animationClock.Elapsed.TotalMilliseconds);if(!suppressHover && !gesture.pressed) OpenBubble();};
             MouseDown+=delegate(object sender,MouseEventArgs e) {if(e.Button==MouseButtons.Left){gesture.Down(Cursor.Position,Location);Capture=true;}};
-            MouseMove+=delegate {if(!gesture.pressed)return;Point p=gesture.Move(Cursor.Position);if(gesture.dragged){Location=PetLayout.Clamp(p,Size,Screen.FromPoint(Cursor.Position).WorkingArea);if(!pinned)bubble.Hide();else PlaceBubble();}};
-            MouseUp+=delegate(object sender,MouseEventArgs e) {if(e.Button!=MouseButtons.Left)return;bool click=gesture.Up();Capture=false;if(click){animation.Click(animationClock.Elapsed.TotalMilliseconds);ToggleBubble();}else {animation.Land(animationClock.Elapsed.TotalMilliseconds);suppressHover=true;Save();}};
+            MouseMove+=delegate {if(!gesture.pressed)return;Point p=gesture.Move(Cursor.Position);if(gesture.dragged){if(prefs.dock!="none")lastPose=-1;prefs.dock="none";dockWindow=IntPtr.Zero;Location=PetLayout.Clamp(p,Size,Screen.FromPoint(Cursor.Position).WorkingArea);if(!pinned)bubble.Hide();else PlaceBubble();}};
+            MouseUp+=delegate(object sender,MouseEventArgs e) {if(e.Button!=MouseButtons.Left)return;bool click=gesture.Up();Capture=false;if(click){animation.Click(animationClock.Elapsed.TotalMilliseconds);ToggleBubble();}else {animation.Land(animationClock.Elapsed.TotalMilliseconds);suppressHover=true;if(prefs.snapEdges){string side=PetDocking.Snap(Bounds,Screen.FromPoint(Cursor.Position).WorkingArea,(int)(22*dpi));if(side!="none")DockTo(side,false);}Save();}};
             timer.Tick+=delegate {Tick();};
-            FormClosed+=delegate {timer.Stop();Save();Native.UnregisterHotKey(Handle,1);Native.UnregisterHotKey(Handle,2);bubble.Dispose();tray.Visible=false;tray.Dispose();menu.Dispose();art.Dispose();mascotIcon.Dispose();timer.Dispose();};
+            FormClosed+=delegate {timer.Stop();Save();Native.UnregisterHotKey(Handle,1);Native.UnregisterHotKey(Handle,2);bubble.Dispose();tray.Visible=false;tray.Dispose();menu.Dispose();art.Dispose();perchArt.Dispose();mascotIcon.Dispose();timer.Dispose();};
         }
         protected override bool ShowWithoutActivation {get{return !windowed;}}
+        Rectangle VisiblePetBounds {get{var r=PetDocking.Visible(Size,prefs.dock);r.Offset(Location);return r;}}
+        void RememberWindow(){var h=DockWindows.Candidate(ownProcess);if(h!=IntPtr.Zero)lastExternalWindow=h;}
+        Rectangle DockSurface(){
+            var area=Screen.FromRectangle(VisiblePetBounds).WorkingArea;
+            if(dockWindow!=IntPtr.Zero){
+                Rectangle r;
+                if(DockWindows.Bounds(dockWindow,dockOwner,out r)){
+                    var clipped=Rectangle.Intersect(r,Screen.FromRectangle(r).WorkingArea);
+                    if(clipped.Width>=Width&&clipped.Height>=Height)return clipped;
+                }
+                dockWindow=IntPtr.Zero; // Closed/minimized target: keep the pet accessible on its screen.
+            }
+            return area;
+        }
+        void RefreshDock(){
+            var area=DockSurface();
+            if(prefs.dock=="none")Location=PetLayout.Clamp(Location,Size,area);
+            else {
+                var p=Location;
+                if(prefs.dock=="bottom")p.X=area.Left+(int)Math.Round((area.Width-Width)*prefs.dockFraction);
+                else p.Y=area.Top+(int)Math.Round((area.Height-Height)*prefs.dockFraction);
+                Location=PetDocking.Place(p,Size,area,prefs.dock);
+            }
+            PlaceBubble();
+        }
+        void DockTo(string side,bool toWindow){
+            dockWindow=toWindow?lastExternalWindow:IntPtr.Zero;dockOwner=DockWindows.Owner(dockWindow);prefs.dock=PetDocking.Normalize(side);
+            var area=DockSurface();
+            prefs.dockFraction=prefs.dock=="bottom"?(Left-area.Left)/(double)Math.Max(1,area.Width-Width):(Top-area.Top)/(double)Math.Max(1,area.Height-Height);
+            prefs.dockFraction=Math.Max(0,Math.Min(1,prefs.dockFraction));lastPose=-1;RefreshDock();PaintPet();Save();
+        }
+        void Detach(){prefs.dock="none";dockWindow=IntPtr.Zero;lastPose=-1;RefreshDock();PaintPet();}
         protected override CreateParams CreateParams {get{var cp=base.CreateParams;cp.ExStyle|=0x80000;if(!windowed)cp.ExStyle|=0x80|0x8000000;return cp;}}
         protected override void WndProc(ref Message m) {if(m.Msg==0x312){if(m.WParam.ToInt32()==1){hidden=!hidden;if(hidden){Hide();bubble.Hide();}else Show();}else {hidden=false;Show();ToggleBubble();}return;}base.WndProc(ref m);}
         void PaintPet() {
-            var attention=Bounds;attention.Inflate(Width*2,Height*2);
+            var attention=VisiblePetBounds;attention.Inflate(Width*2,Height*2);
             var cursor=Cursor.Position;
             var motion=animation.Sample(animationClock.Elapsed.TotalMilliseconds,(cursor.X-(Left+Width/2.0))/(Width*.8),attention.Contains(cursor),gesture.pressed && gesture.dragged,prefs.gentle);
             lastMotion=motion;
             if(prefs.gentle && motion.pose==lastPose && renderedSize==Size)return;
-            LayeredPet.Draw(this,art.Render(Size,motion));lastPose=motion.pose;renderedSize=Size;renderCount++;
+            LayeredPet.Draw(this,prefs.dock=="none"?art.Render(Size,motion):perchArt.Render(Size,prefs.dock,motion.pose,animationClock.Elapsed.TotalMilliseconds,prefs.gentle));lastPose=motion.pose;renderedSize=Size;renderCount++;
         }
         void Save() {prefs.x=Left;prefs.y=Top;try{Overlay.AtomicWrite(Path.Combine(root,"pet-settings.json"),json.Serialize(prefs));}catch{}}
-        void PlaceBubble() {bubble.Location=PetLayout.Bubble(Bounds,bubble.Size,Screen.FromRectangle(Bounds).WorkingArea);}
+        void PlaceBubble() {if(bubble!=null)bubble.Location=PetLayout.Bubble(VisiblePetBounds,bubble.Size,Screen.FromRectangle(VisiblePetBounds).WorkingArea);}
         void OpenBubble() {if(hidden)return;bubble.Pinned=pinned;PlaceBubble();bubble.SetData(data,network);if(!bubble.Visible)bubble.Show(this);lastInside=DateTimeOffset.Now;}
         void ToggleBubble() {if(pinned){pinned=false;bubble.Hide();suppressHover=true;}else {pinned=true;OpenBubble();}bubble.Pinned=pinned;bubble.Invalidate();}
         void Tick() {
             var now=DateTimeOffset.Now;
+            if(!gesture.pressed&&now>=nextDockCheck){nextDockCheck=now.AddMilliseconds(250);RememberWindow();RefreshDock();}
             if(!hidden)PaintPet();
-            bool inPet=Bounds.Contains(Cursor.Position),inside=inPet || (bubble.Visible && bubble.Bounds.Contains(Cursor.Position));
+            bool inPet=VisiblePetBounds.Contains(Cursor.Position),inside=inPet || (bubble.Visible && bubble.Bounds.Contains(Cursor.Position));
             if(!inPet)suppressHover=false;
             if(inside)lastInside=now;else if(!pinned && (now-lastInside).TotalMilliseconds>650)bubble.Hide();
             if(dataTask!=null && dataTask.IsCompleted){
                 if(dataTask.IsFaulted)data.error="会话观测暂不可用";else data=dataTask.Result;dataTask=null;bubble.SetData(data,network);PlaceBubble();
-                try{Overlay.AtomicWrite(Path.Combine(root,"runtime.json"),json.Serialize(new{version="0.4.3",mode="desktop-pet",observedAt=now.ToString("o"),pet=new{x=Left,y=Top,size=prefs.size,style="mint-dress-expressive",animationPose=lastPose,animationExpression=PetSprites.Names[Math.Max(0,lastPose)],animationAction=lastMotion.action,animationTilt=lastMotion.tilt,animationLift=lastMotion.lift,gentle=prefs.gentle,animationIntervalMs=timer.Interval,renderCount=renderCount,trayIcon="mint-girl.ico"},scope="all-local-codex-projects",dashboard=data,network=network}));}catch{}
+                try{Overlay.AtomicWrite(Path.Combine(root,"runtime.json"),json.Serialize(new{version="0.4.4",mode="desktop-pet",observedAt=now.ToString("o"),pet=new{x=Left,y=Top,size=prefs.size,style="mint-dress-expressive",dock=prefs.dock,dockTarget=prefs.dock=="none"?"none":dockWindow==IntPtr.Zero?"screen":"window",snapEdges=prefs.snapEdges,visibleBounds=new{x=VisiblePetBounds.X,y=VisiblePetBounds.Y,width=VisiblePetBounds.Width,height=VisiblePetBounds.Height},animationPose=lastPose,animationExpression=PetSprites.Names[Math.Max(0,lastPose)],animationAction=lastMotion.action,animationTilt=lastMotion.tilt,animationLift=lastMotion.lift,gentle=prefs.gentle,animationIntervalMs=timer.Interval,renderCount=renderCount,trayIcon="mint-girl.ico"},scope="all-local-codex-projects",dashboard=data,network=network}));}catch{}
             }
             if(networkTask!=null && networkTask.IsCompleted){network=networkTask.IsFaulted ? new NetworkSnapshot{title="网络检测暂不可用"} : networkTask.Result;networkTask=null;bubble.SetData(data,network);}
             if(dataTask==null && now>=nextData){nextData=now.AddSeconds(1);dataTask=Task.Factory.StartNew(()=>observer.Read(DateTimeOffset.Now));}

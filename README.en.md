@@ -8,6 +8,8 @@ A lightweight Windows desktop companion that shows local Codex chat activity, ac
 
 ## Features
 
+- **Half-body edge poses:** drag near the bottom taskbar or either screen side to cling with both hands. Drag away to restore the full body. Blinking and smiling continue while docked.
+- **Window attachment:** select the most recently used window and its bottom, left or right edge through the context menu. The pet follows movement and resizing, falling back to the screen when the target is minimized, hidden or closed.
 - **Twelve expressions:** mint-green hair and a pink dress, with natural blinking, side glances, closed-mouth smiles, surprise, winks, laughter, waving, curiosity and yawning.
 - **Expressive interaction:** look toward a nearby pointer, greet on hover, smile and bounce on click, look surprised while dragging, and settle on release. Idle behavior adds gentle breathing, swaying and occasional expressions.
 - **Gentle mode:** reduce body movement, bouncing and decorative sparkles through the context menu while keeping facial expressions.
@@ -21,7 +23,7 @@ A lightweight Windows desktop companion that shows local Codex chat activity, ac
 
 ## Download and run
 
-1. Open the [latest release](https://github.com/D-admin/ProgressGlass/releases/latest) and download `ProgressGlass-v0.4.3-windows.zip`.
+1. Open the [latest release](https://github.com/D-admin/ProgressGlass/releases/latest) and download `ProgressGlass-v0.4.4-windows.zip`.
 2. **Extract the whole ZIP** into a writable folder, such as a folder under Documents. Do not run it inside the archive.
 3. Double-click `ProgressGlass.exe`. Keep the `assets` folder beside the executable.
 4. The character appears near the bottom-right corner of the primary screen. Initial session scanning may take a few seconds.
@@ -42,6 +44,8 @@ To upgrade, exit the old pet and extract the complete new archive into a new fol
 | Move outside both character and bubble | Close an unpinned bubble after about 0.65 seconds |
 | Click the character | Respond happily and pin the bubble; click again to close it |
 | Drag the character | Look surprised, move and save the position, then settle on release |
+| Release near the bottom, left or right screen edge | Cling in a half-body pose; drag toward the screen center to detach |
+| Right-click → 依附 / 扒边 (Docking) | Choose an edge or window, detach, or toggle automatic snapping |
 | Pin / close button in the bubble | Pin or dismiss the bubble |
 | Bottom arrows / mouse wheel | Page through activity |
 | Right-click the character or tray icon | Change size, toggle gentle mode, show the bubble, hide, or exit |
@@ -49,6 +53,16 @@ To upgrade, exit the old pet and extract the complete new archive into a new fol
 | `Ctrl+Alt+O` | Open and pin / close the bubble |
 
 Choose 96, 128 or 160 logical pixels; Windows display scaling applies. Touch can use Windows mouse-promotion behavior, but physical touch-screen interaction has not been tested. Use the tray menu if a hotkey conflicts with another application. The current application UI is Chinese; this English guide documents its controls and behavior.
+
+### Cling to the taskbar or a window
+
+![Illustrated docking on screen sides, the taskbar and a window bottom](preview-docking.png)
+
+Drag the character toward the top of the bottom taskbar or either screen side and release. Alternatively, use the right-click submenu “依附 / 扒边” (Docking) to select an edge. “离开边框 · 恢复全身” restores the full-body pose.
+
+To follow an application window, activate that window first, then right-click the pet and choose “依附最近使用的窗口” (Attach to recently used window), followed by its bottom, left or right edge. Hover and click-to-pin still work while docked.
+
+Screen edge and relative position are saved. Window handles are not persisted across restarts; the pet returns to the corresponding screen edge after restart. Minimizing, hiding or closing the target also falls back to the screen, and following requires selecting the window again. Bottom and side edges are supported; the top edge is not. The illustration uses a synthetic desktop without personal data.
 
 ## Understanding the indicators
 
@@ -71,7 +85,7 @@ The program reads event metadata and does not display or upload conversation tex
 
 Running it creates local files beside the executable:
 
-- `pet-settings.json`: character position and size.
+- `pet-settings.json`: position, size, gentle mode, docking edge and automatic snapping preferences.
 - `runtime.json`: diagnostics containing chat titles, paths, activity and usage. **Do not publish this file.**
 - `settings.json`: preferences used by the legacy overlay.
 - `usage-snapshot.json`: optional manually supplied usage snapshot; none is shipped.
@@ -112,7 +126,7 @@ From Windows PowerShell 5.1+ or PowerShell 7 in the repository directory:
 
 The build uses Windows .NET Framework's bundled `csc.exe`; Node.js, Python, NuGet and paid generation services are unnecessary. Tests use local synthetic fixtures and the tracked `examples/blank-progress.json`. The build copies `assets` into the output directory and creates `progress.json` from that generic template only when it is absent, preserving existing records. Personal root-level `progress.json` is ignored by Git; a clean checkout can build and test without it.
 
-Developer options: `--render-style preview.png` exports the twelve-expression preview; `--render-animation frames` exports an interaction animation as a PNG frame sequence; `--render-pet preview.png` exports a live bubble snapshot (reads local state and probes the network); `--legacy` opens the rectangular overlay; `--windowed` exposes a taskbar button for debugging.
+Developer options: `--render-style preview.png` exports the twelve-expression preview; `--render-docking preview.png` exports the docking illustration on a synthetic desktop; `--render-animation frames` exports an interaction animation as a PNG frame sequence; `--render-pet preview.png` exports a live bubble snapshot (reads local state and probes the network); `--legacy` opens the rectangular overlay; `--windowed` exposes a taskbar button for debugging.
 
 ## License and artwork
 

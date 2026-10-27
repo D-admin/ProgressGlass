@@ -1,4 +1,4 @@
-ProgressGlass v0.4.3
+ProgressGlass v0.4.4
 
 This is a new progress-display application reusing specific native-window helpers from OnTopReplica. It is not the complete OnTopReplica application and does not use window mirroring.
 
